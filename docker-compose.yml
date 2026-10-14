@@ -1,0 +1,9 @@
+services:
+  web:
+    build: .
+    container_name: simulador-consular
+    ports:
+      - "8080:80"
+    environment:
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+    restart: unless-stopped
