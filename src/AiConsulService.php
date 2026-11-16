@@ -22,7 +22,7 @@ class AiConsulService
             'key_env'   => 'GEMINI_API_KEY',
             'model_env' => 'GEMINI_MODEL',
             // Lista separada por comas: si un modelo está saturado se usa el siguiente
-            'model'     => 'gemini-3.5-flash,gemini-flash-latest,gemini-3.5-flash-lite',
+            'model'     => 'gemini-3.5-flash-lite,gemini-3.5-flash,gemini-flash-latest',
             'url'       => 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
             'format'    => 'openai',
         ],
