@@ -1,42 +1,87 @@
 <?php
 // api/chat.php
-// Evita que warnings/notices de PHP se mezclen con el JSON de respuesta
+// Envía la respuesta del solicitante al cónsul (IA) y devuelve su réplica.
+// Evita que warnings/notices de PHP se mezclen con el JSON de respuesta.
 ini_set('display_errors', '0');
-set_time_limit(60);
-
-if (!function_exists('curl_init')) {
-    header('Content-Type: application/json');
-    echo json_encode(['error' => 'La extensión cURL de PHP no está habilitada en este servidor.']);
-    exit;
-}
+set_time_limit(90);
 
 require_once __DIR__ . '/../config/api_config.php';
-require_once __DIR__ . '/../src/AiConsulService.php'; // Asegúrate de incluir la clase
+require_once __DIR__ . '/../src/AiConsulService.php';
 
 use App\AiConsulService;
 
-header('Content-Type: application/json');
-
-if (!isset($_SESSION['chat_history'])) {
-    echo json_encode(['error' => 'Sesión no iniciada. Por favor configure sus datos primero.']);
-    exit;
+if (!function_exists('curl_init')) {
+    json_response(['error' => 'La extensión cURL de PHP no está habilitada en este servidor.'], 500);
 }
 
-$input = json_decode(file_get_contents('php://input'), true);
-$userMsg = trim($input['message'] ?? '');
+$input = require_json_post();
 
-// Si hay un mensaje del usuario, agregarlo al historial
-if (!empty($userMsg)) {
-    $_SESSION['chat_history'][] = ['role' => 'user', 'content' => $userMsg];
+if (!isset($_SESSION['interview']['history'])) {
+    json_response(['error' => 'La sesión expiró. Vuelve a enviar tu perfil para iniciar la entrevista.', 'expired' => true], 409);
 }
 
-// Llamar al servicio de la IA
-$aiService = new AiConsulService(OPENAI_API_KEY, OPENAI_MODEL);
-$result = $aiService->sendChat($_SESSION['chat_history']);
+$interview = &$_SESSION['interview'];
 
-// Si la respuesta fue exitosa, guardarla en el historial de la sesión
-if (isset($result['reply'])) {
-    $_SESSION['chat_history'][] = ['role' => 'assistant', 'content' => $result['reply']];
+if ($interview['finished']) {
+    json_response(['error' => 'La entrevista ya terminó. Puedes repetirla o editar tu perfil.', 'finished' => true], 409);
 }
 
-echo json_encode($result);
+$userMsg = trim((string) ($input['message'] ?? ''));
+$userMsg = mb_substr(preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $userMsg) ?? '', 0, MAX_MESSAGE_LENGTH);
+
+$isOpening = $interview['turns'] === 0 && count($interview['history']) === 2;
+if ($userMsg === '' && !$isOpening) {
+    json_response(['error' => 'Escribe una respuesta antes de enviar.'], 422);
+}
+
+$messages = $interview['history'];
+if ($userMsg !== '') {
+    $messages[] = ['role' => 'user', 'content' => $userMsg];
+}
+
+$turns = $interview['turns'] + ($userMsg !== '' ? 1 : 0);
+if ($turns >= MAX_USER_TURNS) {
+    // Nota temporal (no se guarda en el historial) para cerrar la entrevista.
+    $messages[] = [
+        'role'    => 'system',
+        'content' => 'Se alcanzó el límite de preguntas. Emite ahora la decisión final con el formato indicado, empezando con ' . DECISION_MARKER . '.',
+    ];
+}
+
+// Libera el bloqueo de la sesión mientras esperamos a la IA, para no
+// congelar otras peticiones del mismo usuario.
+session_write_close();
+
+$ai = new AiConsulService(GROQ_API_KEY, GROQ_MODEL, GROQ_API_URL, CURL_CA_BUNDLE);
+$result = $ai->sendChat($messages);
+
+if (!isset($result['reply'])) {
+    json_response(['error' => $result['error'] ?? 'Error desconocido.'], 502);
+}
+
+$reply = $result['reply'];
+$finished = mb_strpos($reply, DECISION_MARKER) !== false;
+
+// Reabre la sesión para guardar el progreso solo si la llamada tuvo éxito,
+// así un error no deja el historial a medias.
+session_start();
+$interview = &$_SESSION['interview'];
+if ($userMsg !== '') {
+    $interview['history'][] = ['role' => 'user', 'content' => $userMsg];
+}
+$interview['history'][] = ['role' => 'assistant', 'content' => $reply];
+$interview['turns'] = $turns;
+$interview['finished'] = $finished;
+
+$approved = null;
+if ($finished && preg_match('/' . preg_quote(DECISION_MARKER, '/') . '\W*(?:VISA\s+)?(APROBADA|RECHAZADA)/iu', $reply, $m)) {
+    $approved = mb_strtoupper($m[1]) === 'APROBADA';
+}
+
+json_response([
+    'reply'    => $reply,
+    'finished' => $finished,
+    'approved' => $approved,
+    'turns'    => $turns,
+    'maxTurns' => MAX_USER_TURNS,
+]);

@@ -1,196 +1,462 @@
+// assets/js/voice_engine.js
+// Lógica del simulador: formulario de perfil, chat con el cónsul y voz.
 document.addEventListener('DOMContentLoaded', () => {
-    const uploadForm = document.getElementById('upload-form');
-    const uploadStatus = document.getElementById('upload-status');
-    const stepUpload = document.getElementById('step-upload');
-    const stepChat = document.getElementById('step-chat');
+    const $ = (id) => document.getElementById(id);
+    const DECISION_MARKER = '[DECISIÓN FINAL]';
 
-    const chatContainer = document.getElementById('chat-container');
-    const userInput = document.getElementById('user-input');
-    const btnSend = document.getElementById('btn-send');
-    const btnMic = document.getElementById('btn-mic');
-    const voiceToggle = document.getElementById('voice-toggle');
+    const form = $('upload-form');
+    const uploadStatus = $('upload-status');
+    const stepUpload = $('step-upload');
+    const stepChat = $('step-chat');
+    const btnStart = $('btn-start');
 
-    if (uploadForm) {
-        uploadForm.addEventListener('submit', async (e) => {
-            // EVITAR RECARGA DE PÁGINA
-            e.preventDefault();
-            
-            try {
-                // Obtener países seleccionados si existe el elemento
-                const paisesSelect = document.getElementById('paises_visitados');
-                let paisesSeleccionados = 'Ninguno';
-                if (paisesSelect) {
-                    paisesSeleccionados = Array.from(paisesSelect.selectedOptions).map(opt => opt.value).join(', ');
-                }
+    const chatContainer = $('chat-container');
+    const userInput = $('user-input');
+    const btnSend = $('btn-send');
+    const btnMic = $('btn-mic');
+    const btnRestart = $('btn-restart');
+    const btnEdit = $('btn-edit');
+    const voiceToggle = $('voice-toggle');
+    const questionCounter = $('question-counter');
+    const inputGroup = $('chat-input-group');
 
-                // Capturar valores con fallback seguro (evita errores si algún ID no existe)
-                const getValue = (id) => {
-                    const el = document.getElementById(id);
-                    return el ? el.value.trim() : 'No especificado';
-                };
+    let lastProfile = null;
+    let busy = false;
+    let finished = false;
+    let questionNumber = 0;
+    let maxTurns = 10;
 
-                const perfilData = {
-                    nombre: getValue('nombre'),
-                    estado_civil: getValue('estado_civil'),
-                    hijos: getValue('hijos'),
-                    padre: getValue('nombre_padre'),
-                    padre_eeuu: getValue('padre_eeuu'),
-                    madre: getValue('nombre_madre'),
-                    madre_eeuu: getValue('madre_eeuu'),
-                    ocupacion: getValue('ocupacion'),
-                    empresa: getValue('empresa'),
-                    antiguedad: getValue('antiguedad'),
-                    ingresos: getValue('ingresos'),
-                    otros_ingresos: getValue('otros_ingresos'),
-                    motivo_viaje: getValue('motivo_viaje'),
-                    destino: getValue('destino'),
-                    tiempo_estadia: getValue('tiempo_estadia'),
-                    fecha_viaje: getValue('fecha_viaje'),
-                    financiacion: getValue('financiacion'),
-                    acompanantes: getValue('acompanantes'),
-                    paises_visitados: paisesSeleccionados || 'Ninguno',
-                    negacion_visa: getValue('negacion_visa'),
-                    negacion_entrada: getValue('negacion_entrada'),
-                    antecedentes_judiciales: getValue('antecedentes_judiciales'),
-                    overstay: getValue('overstay')
-                };
+    /* =========================================================
+     * 1. FORMULARIO
+     * ======================================================= */
 
-                uploadStatus.innerHTML = '<span class="text-info">Iniciando ventanilla consular...</span>';
+    // Campos de detalle que solo aparecen si la respuesta lo requiere.
+    // Formato: data-show-when="campo=Valor1|Valor2"
+    const conditionals = [...document.querySelectorAll('[data-show-when]')].map((el) => {
+        const [field, values] = el.dataset.showWhen.split('=');
+        return { el, source: $(field), values: values.split('|') };
+    });
 
-                const ds160Text = `
-                    Nombre: ${perfilData.nombre}
-                    Estado Civil: ${perfilData.estado_civil}
-                    Hijos: ${perfilData.hijos}
-                    Padre: ${perfilData.padre} (En EE.UU.: ${perfilData.padre_eeuu})
-                    Madre: ${perfilData.madre} (En EE.UU.: ${perfilData.madre_eeuu})
-                    Ocupación: ${perfilData.ocupacion} en ${perfilData.empresa} (Antigüedad: ${perfilData.antiguedad})
-                    Ingresos: ${perfilData.ingresos} | Otros ingresos: ${perfilData.otros_ingresos}
-                    Motivo de viaje: ${perfilData.motivo_viaje} a ${perfilData.destino}
-                    Estadía: ${perfilData.tiempo_estadia} (Fecha: ${perfilData.fecha_viaje})
-                    Financiamiento: ${perfilData.financiacion}
-                    Acompañantes: ${perfilData.acompanantes}
-                    Países visitados: ${perfilData.paises_visitados}
-                    Negación de visa previa: ${perfilData.negacion_visa}
-                    Negación de entrada previa: ${perfilData.negacion_entrada}
-                    Antecedentes: ${perfilData.antecedentes_judiciales}
-                    Overstay: ${perfilData.overstay}
-                `;
+    function updateConditionals() {
+        conditionals.forEach(({ el, source, values }) => {
+            const visible = source && values.includes(source.value);
+            el.classList.toggle('d-none', !visible);
+        });
+    }
+    conditionals.forEach(({ source }) => source && source.addEventListener('change', updateConditionals));
+    updateConditionals();
 
-                const res = await fetch('api/upload.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ds160_text: ds160Text })
-                });
+    // Países: buscador, chips de seleccionados y casilla "ninguno".
+    const countriesSelect = $('paises_visitados');
+    const countryFilter = $('filtro_paises');
+    const countryChips = $('paises-seleccionados');
+    const noneCheckbox = $('ningun_pais');
 
-                const data = await res.json();
+    function renderCountryChips() {
+        if (!countryChips || !countriesSelect) return;
+        countryChips.replaceChildren(...[...countriesSelect.selectedOptions].map((opt) => {
+            const chip = document.createElement('button');
+            chip.type = 'button';
+            chip.className = 'btn btn-sm btn-primary country-chip';
+            chip.textContent = `${opt.value} ✕`;
+            chip.title = `Quitar ${opt.value}`;
+            chip.addEventListener('click', () => {
+                opt.selected = false;
+                renderCountryChips();
+            });
+            return chip;
+        }));
+    }
 
-                if (data.success) {
-                    stepUpload.classList.add('d-none');
-                    stepChat.classList.remove('d-none');
-                    triggerConsulResponse('');
-                } else {
-                    uploadStatus.innerHTML = `<span class="text-danger">${data.error || 'Error desconocido al procesar.'}</span>`;
-                }
-            } catch (err) {
-                console.error("Error al procesar el formulario:", err);
-                uploadStatus.innerHTML = `<span class="text-danger">Error conectando con el servidor: ${err.message}</span>`;
+    if (countriesSelect) {
+        countriesSelect.addEventListener('change', () => {
+            if (countriesSelect.selectedOptions.length > 0 && noneCheckbox) noneCheckbox.checked = false;
+            renderCountryChips();
+        });
+    }
+
+    if (countryFilter && countriesSelect) {
+        const normalize = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+        countryFilter.addEventListener('input', () => {
+            const q = normalize(countryFilter.value.trim());
+            [...countriesSelect.options].forEach((opt) => {
+                opt.hidden = q !== '' && !normalize(opt.value).includes(q);
+            });
+        });
+    }
+
+    if (noneCheckbox && countriesSelect) {
+        noneCheckbox.addEventListener('change', () => {
+            if (noneCheckbox.checked) {
+                [...countriesSelect.options].forEach((opt) => { opt.selected = false; });
+                renderCountryChips();
             }
         });
     }
 
-    // Funciones del Chat
-    async function sendMessage() {
-        const text = userInput.value.trim();
-        if (!text) return;
+    // Fechas coherentes
+    const today = new Date();
+    const todayStr = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    const departure = $('fecha_viaje');
+    const returnDate = $('fecha_regreso');
+    const jobStart = $('antiguedad');
+    if (departure) departure.min = todayStr;
+    if (jobStart) jobStart.max = todayStr;
 
-        appendMessage('user', text);
-        userInput.value = '';
-        setControls(false);
+    function validateDates() {
+        if (!departure || !returnDate) return true;
+        returnDate.min = departure.value || todayStr;
+        const bad = departure.value && returnDate.value && returnDate.value < departure.value;
+        returnDate.setCustomValidity(bad ? 'La fecha de regreso no puede ser anterior a la fecha de salida.' : '');
+        return !bad;
+    }
+    departure && departure.addEventListener('change', validateDates);
+    returnDate && returnDate.addEventListener('change', validateDates);
 
-        await triggerConsulResponse(text);
+    function collectProfile() {
+        const profile = {};
+        const data = new FormData(form);
+        for (const [key, value] of data.entries()) {
+            if (key === 'paises_visitados[]' || key === 'ningun_pais') continue;
+            const field = form.elements[key];
+            const wrapper = field && field.closest && field.closest('[data-show-when]');
+            if (wrapper && wrapper.classList.contains('d-none')) continue; // detalle oculto
+            const text = String(value).trim();
+            if (text) profile[key] = text;
+        }
+        const countries = countriesSelect ? [...countriesSelect.selectedOptions].map((o) => o.value) : [];
+        if (countries.length) profile.paises_visitados = countries.join(', ');
+        else if (noneCheckbox && noneCheckbox.checked) profile.paises_visitados = 'Ninguno';
+        return profile;
     }
 
-    if (btnSend) btnSend.addEventListener('click', sendMessage);
-    if (userInput) userInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
+    function setStatus(html, type = 'info') {
+        uploadStatus.innerHTML = html ? `<span class="text-${type}">${html}</span>` : '';
+    }
 
-    async function triggerConsulResponse(message) {
+    if (form) {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!validateDates() || !form.reportValidity()) return;
+            lastProfile = collectProfile();
+            await startInterview(lastProfile);
+        });
+    }
+
+    /* =========================================================
+     * 2. ENTREVISTA
+     * ======================================================= */
+
+    async function postJson(url, body) {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify(body),
+        });
+        const raw = await res.text();
         try {
-            const res = await fetch('api/chat.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: message })
-            });
-            const raw = await res.text();
-            let data;
-            try {
-                data = JSON.parse(raw);
-            } catch (parseErr) {
-                console.error('Respuesta no JSON de api/chat.php (HTTP ' + res.status + '):', raw);
-                appendMessage('assistant', 'Error del servidor (HTTP ' + res.status + '): ' + raw.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300));
-                return;
-            }
-
-            if (data.reply) {
-                appendMessage('assistant', data.reply);
-                if (voiceToggle && voiceToggle.checked) speakText(data.reply);
-            } else if (data.error) {
-                appendMessage('assistant', 'Error: ' + data.error);
-            }
-        } catch (e) {
-            appendMessage('assistant', 'Error de red al conectar con el cónsul.');
-        } finally {
-            setControls(true);
+            return { status: res.status, data: JSON.parse(raw) };
+        } catch {
+            console.error(`Respuesta no JSON de ${url} (HTTP ${res.status}):`, raw);
+            const snippet = raw.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+            return { status: res.status, data: { error: `Error del servidor (HTTP ${res.status}). ${snippet}` } };
         }
     }
 
+    async function startInterview(profile) {
+        btnStart && (btnStart.disabled = true);
+        setStatus('<span class="spinner-border spinner-border-sm me-2"></span>Preparando la ventanilla consular...', 'primary');
+        try {
+            const { data } = await postJson('api/start.php', { perfil: profile });
+            if (!data.success) {
+                setStatus(escapeHtml(data.error || 'Error desconocido al procesar.'), 'danger');
+                if (data.missing && data.missing[0] && $(data.missing[0])) $(data.missing[0]).focus();
+                return;
+            }
+            maxTurns = data.maxTurns || maxTurns;
+            setStatus('');
+            resetChat();
+            stepUpload.classList.add('d-none');
+            stepChat.classList.remove('d-none');
+            stepChat.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            await askConsul('');
+        } catch (err) {
+            console.error('Error al iniciar la entrevista:', err);
+            setStatus(`Error conectando con el servidor: ${escapeHtml(err.message)}`, 'danger');
+        } finally {
+            btnStart && (btnStart.disabled = false);
+        }
+    }
+
+    function resetChat() {
+        stopSpeaking();
+        chatContainer.replaceChildren();
+        finished = false;
+        questionNumber = 0;
+        inputGroup.classList.remove('d-none');
+        updateCounter();
+    }
+
+    function updateCounter() {
+        if (!questionCounter) return;
+        questionCounter.textContent = finished
+            ? 'Entrevista terminada'
+            : questionNumber > 0 ? `Pregunta ${questionNumber}` : '';
+    }
+
+    async function sendMessage() {
+        const text = userInput.value.trim();
+        if (!text || busy || finished) return;
+        stopSpeaking();
+        appendMessage('user', text);
+        userInput.value = '';
+        await askConsul(text);
+    }
+
+    async function askConsul(message) {
+        busy = true;
+        setControls(false);
+        const typing = showTyping();
+        try {
+            const { data } = await postJson('api/chat.php', { message });
+            typing.remove();
+
+            if (data.reply) {
+                finished = Boolean(data.finished);
+                if (finished) {
+                    appendDecision(data.reply, data.approved);
+                } else {
+                    questionNumber += 1;
+                    appendMessage('assistant', data.reply);
+                }
+                updateCounter();
+                speak(data.reply);
+            } else {
+                appendMessage('error', data.error || 'Error desconocido.');
+                if (data.finished) finished = true;
+                if (data.expired) appendMessage('error', 'Pulsa "Repetir entrevista" para empezar de nuevo con tu perfil.');
+            }
+        } catch (err) {
+            typing.remove();
+            appendMessage('error', 'Error de red al conectar con el cónsul. Revisa tu conexión e intenta de nuevo.');
+        } finally {
+            busy = false;
+            if (finished) {
+                inputGroup.classList.add('d-none');
+            } else {
+                setControls(true);
+            }
+        }
+    }
+
+    btnSend && btnSend.addEventListener('click', sendMessage);
+    userInput && userInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.isComposing) {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
+
+    btnRestart && btnRestart.addEventListener('click', () => {
+        if (busy) return;
+        if (!lastProfile) { showForm(); return; }
+        startInterview(lastProfile);
+    });
+
+    btnEdit && btnEdit.addEventListener('click', () => {
+        if (busy) return;
+        showForm();
+    });
+
+    function showForm() {
+        stopSpeaking();
+        stepChat.classList.add('d-none');
+        stepUpload.classList.remove('d-none');
+        stepUpload.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    /* =========================================================
+     * 3. RENDERIZADO DEL CHAT
+     * ======================================================= */
+
+    function escapeHtml(text) {
+        return String(text).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    // Markdown mínimo y seguro (se escapa primero): **negrita**, viñetas y saltos de línea.
+    function renderMarkdown(text) {
+        const lines = escapeHtml(text).split(/\r?\n/);
+        let html = '';
+        let inList = false;
+        for (const line of lines) {
+            const item = line.match(/^\s*[-*•]\s+(.*)$/);
+            if (item) {
+                if (!inList) { html += '<ul>'; inList = true; }
+                html += `<li>${item[1]}</li>`;
+                continue;
+            }
+            if (inList) { html += '</ul>'; inList = false; }
+            if (line.trim()) html += `<p>${line}</p>`;
+        }
+        if (inList) html += '</ul>';
+        return html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    }
+
     function appendMessage(role, text) {
-        if (!chatContainer) return;
         const div = document.createElement('div');
-        div.className = role === 'user' ? 'msg-user' : 'msg-assistant';
-        div.innerText = text;
+        div.className = { user: 'msg-user', assistant: 'msg-assistant', error: 'msg-error' }[role];
+        if (role === 'assistant') {
+            div.innerHTML = '<span class="msg-author">Cónsul</span>' + renderMarkdown(text);
+        } else {
+            div.textContent = text;
+        }
         chatContainer.appendChild(div);
-        chatContainer.scrollTop = chatContainer.scrollHeight;
+        scrollChat();
+        return div;
+    }
+
+    function appendDecision(text, approved) {
+        const body = text.replace(DECISION_MARKER, '').trim();
+        const card = document.createElement('div');
+        const state = approved === true ? 'approved' : approved === false ? 'rejected' : 'neutral';
+        card.className = `decision-card decision-${state}`;
+        const title = approved === true ? '✅ Visa aprobada' : approved === false ? '❌ Visa rechazada' : '📋 Decisión final';
+        const score = body.match(/(\d{1,2})\s*\/\s*10/);
+        card.innerHTML = `
+            <div class="decision-header">
+                <span>${title}</span>
+                ${score ? `<span class="decision-score">${escapeHtml(score[1])}/10</span>` : ''}
+            </div>
+            <div class="decision-body">${renderMarkdown(body.replace(/^.*?(APROBADA|RECHAZADA)\s*/i, ''))}</div>
+            <div class="decision-footer">Resultado simulado con fines de práctica. No predice la decisión real del consulado.</div>`;
+        chatContainer.appendChild(card);
+        scrollChat();
+    }
+
+    function showTyping() {
+        const div = document.createElement('div');
+        div.className = 'msg-assistant typing';
+        div.setAttribute('aria-label', 'El cónsul está escribiendo');
+        div.innerHTML = '<span></span><span></span><span></span>';
+        chatContainer.appendChild(div);
+        scrollChat();
+        return div;
+    }
+
+    function scrollChat() {
+        chatContainer.scrollTo({ top: chatContainer.scrollHeight, behavior: 'smooth' });
     }
 
     function setControls(enable) {
-        if (userInput) userInput.disabled = !enable;
-        if (btnSend) btnSend.disabled = !enable;
-        if (btnMic) btnMic.disabled = !enable;
-        if (enable && userInput) userInput.focus();
+        userInput.disabled = !enable;
+        btnSend.disabled = !enable;
+        btnMic.disabled = !enable;
+        if (enable) userInput.focus();
     }
 
-    // Reconocimiento de Voz
+    /* =========================================================
+     * 4. VOZ: reconocimiento (micrófono) y síntesis (cónsul)
+     * ======================================================= */
+
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let listening = false;
+
     if (SpeechRecognition && btnMic) {
         const recognition = new SpeechRecognition();
         recognition.lang = 'es-DO';
+        recognition.interimResults = true;
+        recognition.maxAlternatives = 1;
 
-        btnMic.addEventListener('click', () => {
-            recognition.start();
-            btnMic.classList.replace('btn-outline-danger', 'btn-danger');
-        });
-
-        recognition.onresult = (e) => {
-            userInput.value = e.results[0][0].transcript;
-            btnMic.classList.replace('btn-danger', 'btn-outline-danger');
-            sendMessage();
+        const setListening = (on) => {
+            listening = on;
+            btnMic.classList.toggle('btn-danger', on);
+            btnMic.classList.toggle('btn-outline-danger', !on);
+            btnMic.classList.toggle('mic-listening', on);
+            btnMic.setAttribute('aria-pressed', String(on));
+            userInput.placeholder = on ? 'Escuchando... habla ahora' : 'Escribe tu respuesta o usa el micrófono...';
         };
 
-        recognition.onerror = () => btnMic.classList.replace('btn-danger', 'btn-outline-danger');
+        btnMic.addEventListener('click', () => {
+            if (listening) { recognition.stop(); return; }
+            stopSpeaking();
+            try {
+                recognition.start();
+                setListening(true);
+            } catch (err) {
+                console.warn('No se pudo iniciar el micrófono:', err);
+            }
+        });
+
+        let finalText = '';
+        recognition.onstart = () => { finalText = ''; };
+        recognition.onresult = (e) => {
+            let interim = '';
+            for (let i = e.resultIndex; i < e.results.length; i++) {
+                const t = e.results[i][0].transcript;
+                if (e.results[i].isFinal) finalText += t; else interim += t;
+            }
+            userInput.value = (finalText + interim).trim();
+        };
+        recognition.onend = () => {
+            setListening(false);
+            if (finalText.trim()) {
+                userInput.value = finalText.trim();
+                sendMessage();
+            }
+        };
+        recognition.onerror = (e) => {
+            setListening(false);
+            if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+                appendMessage('error', 'El navegador bloqueó el micrófono. Permite el acceso o escribe tu respuesta.');
+            }
+        };
     } else if (btnMic) {
         btnMic.style.display = 'none';
     }
 
-    // Voz del Cónsul
-    function speakText(text) {
+    let spanishVoice = null;
+    function pickVoice() {
         if (!('speechSynthesis' in window)) return;
+        const voices = window.speechSynthesis.getVoices();
+        spanishVoice = voices.find((v) => /^es[-_](US|MX|DO|419)/i.test(v.lang))
+            || voices.find((v) => /^es/i.test(v.lang))
+            || null;
+    }
+    if ('speechSynthesis' in window) {
+        pickVoice();
+        window.speechSynthesis.onvoiceschanged = pickVoice;
+    }
+
+    function speak(text) {
+        if (!('speechSynthesis' in window) || !voiceToggle || !voiceToggle.checked) return;
         window.speechSynthesis.cancel();
 
-        const cleanText = text.replace(/[DECISIÓN FINAL]/g, '');
-        const utterance = new SpeechSynthesisUtterance(cleanText);
-        utterance.lang = 'es-US';
-        utterance.rate = 0.95;
+        let spoken = text;
+        if (text.includes(DECISION_MARKER)) {
+            // En la decisión, solo se lee el veredicto y lo que diría el cónsul.
+            spoken = text.split(/\*\*Puntos fuertes/i)[0];
+        }
+        spoken = spoken
+            .split(DECISION_MARKER).join('')
+            .replace(/[*_#>`]/g, '')
+            .replace(/^\s*-\s+/gm, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+        if (!spoken) return;
 
+        const utterance = new SpeechSynthesisUtterance(spoken);
+        utterance.lang = spanishVoice ? spanishVoice.lang : 'es-US';
+        if (spanishVoice) utterance.voice = spanishVoice;
+        utterance.rate = 0.95;
         window.speechSynthesis.speak(utterance);
     }
+
+    function stopSpeaking() {
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    }
+
+    voiceToggle && voiceToggle.addEventListener('change', () => {
+        if (!voiceToggle.checked) stopSpeaking();
+    });
 });

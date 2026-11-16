@@ -12,12 +12,14 @@
 </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Practica tu entrevista de visa B1/B2 con un cónsul simulado por IA, basado en tu perfil DS-160.">
+    <meta name="theme-color" content="#1e3a8a">
     <title>Simulador Consular DS-160 | Perfil Personalizado</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/style.css?v=2">
 </head>
 <body>
-<div class="container py-5" style="max-width: 950px;">
+<div class="container py-5 app-container">
     <div class="text-center mb-5">
         <h1 class="hero-title">🏛️ Simulador de Entrevista Consular</h1>
         <p class="text-muted">Completa los datos de tu perfil DS-160 para generar una simulación personalizada con IA.</p>
@@ -94,7 +96,7 @@
                             <option value="Sí">Sí</option>
                         </select>
                     </div>
-                    <div class="col-12 mb-3">
+                    <div class="col-12 mb-3" data-show-when="familiares_eeuu=Sí">
                         <label for="detalle_familiares_eeuu" class="form-label fw-semibold">Si respondió sí, indique parentesco y situación migratoria si la conoce</label>
                         <input type="text" id="detalle_familiares_eeuu" name="detalle_familiares_eeuu" class="form-control" placeholder="Ej. Hermana, residente permanente">
                     </div>
@@ -130,7 +132,7 @@
                             <option value="Sí">Sí</option>
                         </select>
                     </div>
-                    <div class="col-md-6 mb-3">
+                    <div class="col-md-6 mb-3" data-show-when="estudios_actuales=Sí">
                         <label for="detalle_estudios" class="form-label fw-semibold">Institución, programa y horario (si aplica)</label>
                         <input type="text" id="detalle_estudios" name="detalle_estudios" class="form-control" placeholder="Ej. Instituto, carrera, horario">
                     </div>
@@ -144,7 +146,7 @@
                             <option value="Pendiente">Pendiente de aprobación</option>
                         </select>
                     </div>
-                    <div class="col-md-6 mb-3">
+                    <div class="col-md-6 mb-3" data-show-when="vacaciones_autorizadas=Sí|Pendiente">
                         <label for="detalle_vacaciones" class="form-label fw-semibold">Fechas o días de vacaciones disponibles</label>
                         <input type="text" id="detalle_vacaciones" name="detalle_vacaciones" class="form-control" placeholder="Ej. Del 1 al 10 de agosto">
                     </div>
@@ -212,12 +214,13 @@
                             <option value="Sí">Sí</option>
                         </select>
                     </div>
-                    <div class="col-12 mb-3">
+                    <div class="col-12 mb-3" data-show-when="viajes_eeuu=Sí">
                         <label for="detalle_viajes_eeuu" class="form-label fw-semibold">Si ha viajado, indique fechas aproximadas y duración de las estadías</label>
                         <textarea id="detalle_viajes_eeuu" name="detalle_viajes_eeuu" class="form-control" rows="2" placeholder="Incluya entradas y salidas si las recuerda"></textarea>
                     </div>
                     <div class="col-12 mb-3">
                         <label for="paises_visitados" class="form-label fw-semibold">Otros países visitados en los últimos 5 años</label>
+                        <input type="search" id="filtro_paises" class="form-control form-control-sm mb-2" placeholder="🔎 Buscar país..." aria-label="Buscar país" autocomplete="off">
                         <select id="paises_visitados" name="paises_visitados[]" class="form-select" multiple size="6" aria-describedby="ayuda-paises">
                         <option value="Afganistán">Afganistán</option>
                         <option value="Albania">Albania</option>
@@ -415,7 +418,8 @@
                         <option value="Zambia">Zambia</option>
                         <option value="Zimbabue">Zimbabue</option>
                         </select>
-                        <small id="ayuda-paises" class="text-muted">En Windows, mantén presionado Ctrl; en Mac, Cmd, para seleccionar varios países. No incluyas Estados Unidos aquí si ya respondiste en el campo de viajes anteriores a EE. UU.</small>
+                        <div id="paises-seleccionados" class="mt-2 d-flex flex-wrap gap-1" aria-live="polite"></div>
+                        <small id="ayuda-paises" class="text-muted d-block">En Windows, mantén presionado Ctrl; en Mac, Cmd, para seleccionar varios países. No incluyas Estados Unidos aquí si ya respondiste en el campo de viajes anteriores a EE. UU.</small>
                         <div class="form-check mt-2">
                             <input class="form-check-input" type="checkbox" id="ningun_pais" name="ningun_pais" value="Sí">
                             <label class="form-check-label" for="ningun_pais">No he visitado otros países en los últimos 5 años</label>
@@ -432,7 +436,7 @@
                             <option value="Sí">Sí</option>
                         </select>
                     </div>
-                    <div class="col-md-6 mb-3">
+                    <div class="col-md-6 mb-3" data-show-when="negacion_visa=Sí">
                         <label for="detalle_negacion_visa" class="form-label fw-semibold">Si respondió sí, explique brevemente</label>
                         <input type="text" id="detalle_negacion_visa" name="detalle_negacion_visa" class="form-control" placeholder="Año y circunstancias, si las conoce">
                     </div>
@@ -464,10 +468,10 @@
                 </div>
 
                 <div class="alert alert-info mt-4" role="note">
-                    <strong>Importante:</strong> utiliza información veraz y coherente con tu solicitud. Este simulador es una herramienta de práctica y no garantiza la aprobación de una visa.
+                    <strong>Importante:</strong> utiliza información veraz y coherente con tu solicitud. Este simulador es una herramienta de práctica: no está afiliado al Departamento de Estado ni garantiza la aprobación de una visa. Tus respuestas se envían a un servicio de IA (Groq) solo para generar la entrevista y no se guardan en este servidor.
                 </div>
                 <div class="d-grid mt-4">
-                    <button type="submit" class="btn btn-primary btn-lg py-3">🚀 Generar cónsul y empezar entrevista</button>
+                    <button type="submit" id="btn-start" class="btn btn-primary btn-lg py-3">🚀 Generar cónsul y empezar entrevista</button>
                 </div>
             </form>
             <div id="upload-status" class="mt-3 text-center fw-semibold" role="status" aria-live="polite"></div>
@@ -480,7 +484,7 @@
             <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
                 <div>
                     <h5 class="card-title text-primary mb-0">Ventanilla Consular Activa</h5>
-                    <small class="text-muted">Responde con naturalidad, claridad y brevedad.</small>
+                    <small class="text-muted">Responde con naturalidad, claridad y brevedad. <span id="question-counter" class="badge text-bg-light border ms-1"></span></small>
                 </div>
                 <div class="form-check form-switch">
                     <input class="form-check-input" type="checkbox" id="voice-toggle" name="voice_toggle" checked>
@@ -488,65 +492,19 @@
                 </div>
             </div>
             <div id="chat-container" class="chat-container mb-3 shadow-sm" aria-live="polite" aria-label="Conversación de entrevista"></div>
-            <div class="input-group">
+            <div id="chat-input-group" class="input-group">
                 <input type="text" id="user-input" name="user_input" class="form-control form-control-lg" placeholder="Escribe tu respuesta o usa el micrófono..." autocomplete="off" disabled>
                 <button type="button" id="btn-mic" class="btn btn-outline-danger px-3" disabled title="Hablar" aria-label="Hablar">🎙️</button>
                 <button type="button" id="btn-send" class="btn btn-success px-4" disabled>Enviar</button>
+            </div>
+            <div class="d-flex flex-wrap gap-2 justify-content-end mt-3">
+                <button type="button" id="btn-edit" class="btn btn-outline-secondary btn-sm">✏️ Editar perfil</button>
+                <button type="button" id="btn-restart" class="btn btn-outline-primary btn-sm">🔄 Repetir entrevista</button>
             </div>
         </div>
     </div>
 </div>
 
-<script>
-(() => {
-    const form = document.getElementById("upload-form");
-    const countriesSelect = document.getElementById("paises_visitados");
-    const noneCheckbox = document.getElementById("ningun_pais");
-    const departure = document.getElementById("fecha_viaje");
-    const returnDate = document.getElementById("fecha_regreso");
-
-    // "Ninguno" se gestiona con una casilla independiente, no como país.
-    countriesSelect.addEventListener("change", () => {
-        if (countriesSelect.selectedOptions.length > 0) {
-            noneCheckbox.checked = false;
-        }
-    });
-
-    noneCheckbox.addEventListener("change", () => {
-        if (noneCheckbox.checked) {
-            [...countriesSelect.options].forEach(option => option.selected = false);
-        }
-    });
-
-    // Evita escoger una fecha de regreso anterior a la salida.
-    departure.addEventListener("change", () => {
-        returnDate.min = departure.value || "";
-        if (returnDate.value && departure.value && returnDate.value < departure.value) {
-            returnDate.value = "";
-        }
-    });
-
-    returnDate.addEventListener("change", () => {
-        if (departure.value && returnDate.value && returnDate.value < departure.value) {
-            returnDate.setCustomValidity("La fecha de regreso no puede ser anterior a la fecha de salida.");
-        } else {
-            returnDate.setCustomValidity("");
-        }
-    });
-
-    // No intercepta el submit: lo debe manejar voice_engine.js.
-    // Se agrega solo validación cruzada sin interferir con el motor de la aplicación.
-    form.addEventListener("submit", (event) => {
-        if (departure.value && returnDate.value && returnDate.value < departure.value) {
-            event.preventDefault();
-            returnDate.setCustomValidity("La fecha de regreso no puede ser anterior a la fecha de salida.");
-            returnDate.reportValidity();
-        } else {
-            returnDate.setCustomValidity("");
-        }
-    });
-})();
-</script>
-<script src="assets/js/voice_engine.js"></script>
+<script src="assets/js/voice_engine.js?v=2"></script>
 </body>
 </html>
