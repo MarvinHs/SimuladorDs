@@ -262,3 +262,7 @@ body {
     .msg-assistant, .msg-user, .decision-card { break-inside: avoid; max-width: 100% !important; }
     .msg-assistant, .msg-user, .decision-header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* ===== Modo presión ===== */
+.countdown-urgent { animation: countdown-pulse .8s infinite; }
+@keyframes countdown-pulse { 50% { transform: scale(1.08); } }
