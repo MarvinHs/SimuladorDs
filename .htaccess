@@ -1,0 +1,25 @@
+# Seguridad básica (Apache / XAMPP)
+Options -Indexes
+
+# Bloquear archivos ocultos (.env, .git, etc.)
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+# Bloquear archivos de configuración y documentación del proyecto
+<FilesMatch "(?i)\.(md|yml|yaml|example|log)$|^Dockerfile$">
+    Require all denied
+</FilesMatch>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    # config/ y src/ no deben ser accesibles desde el navegador
+    RewriteRule ^(config|src)(/|$) - [F,L]
+</IfModule>
+
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy "microphone=(self), camera=(), geolocation=()"
+</IfModule>
