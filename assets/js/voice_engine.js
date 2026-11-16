@@ -24,6 +24,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const timerBadge = $('interview-timer');
     const settingsBadge = $('settings-badge');
     const STORAGE_KEY = 'simuladords:perfil';
+    const countdownBadge = $('answer-countdown');
+
+    const DIFFICULTY_LABELS = { amable: '😊 Amable', realista: '🧑‍💼 Realista', estricto: '🧐 Estricto', implacable: '🔥 Implacable' };
+    const DIFFICULTY_HELP = {
+        amable: 'Paciente y comprensivo. Ideal para tu primera práctica.',
+        realista: 'Seco y con prisa, como en la ventanilla. Parte de que podrías ser un posible inmigrante y rechaza ante dudas razonables.',
+        estricto: 'Verifica cifras y fechas contra tu perfil, pone preguntas trampa e interrumpe si hablas de más.',
+        implacable: 'Su postura por defecto es rechazar. Presiona, repite preguntas con otras palabras y no perdona contradicciones.',
+    };
+    // Segundos para responder en modo presión, según la dificultad
+    const PRESSURE_SECONDS = { amable: 30, realista: 20, estricto: 15, implacable: 10 };
 
     let lastProfile = null;
     let lastSettings = null;
@@ -217,7 +228,9 @@ document.addEventListener('DOMContentLoaded', () => {
         fillForm(draft.values, draft.countries || []);
         if (draft.settings) {
             document.querySelectorAll('[data-setting]').forEach((el) => {
-                if (draft.settings[el.dataset.setting]) el.value = draft.settings[el.dataset.setting];
+                const v = draft.settings[el.dataset.setting];
+                if (v === undefined || v === null || v === '') return;
+                if (el.type === 'checkbox') el.checked = Boolean(v); else el.value = v;
             });
         }
         if (rememberBox) rememberBox.checked = true;
@@ -232,7 +245,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function collectSettings() {
         const settings = {};
-        document.querySelectorAll('[data-setting]').forEach((el) => { settings[el.dataset.setting] = el.value; });
+        document.querySelectorAll('[data-setting]').forEach((el) => {
+            settings[el.dataset.setting] = el.type === 'checkbox' ? el.checked : el.value;
+        });
         return settings;
     }
 
@@ -269,6 +284,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     loadDraft();
+
+    const difficultySelect = $('ajuste_dificultad');
+    const difficultyHelp = $('dificultad-ayuda');
+    function updateDifficultyHelp() {
+        if (difficultySelect && difficultyHelp) difficultyHelp.textContent = DIFFICULTY_HELP[difficultySelect.value] || '';
+    }
+    difficultySelect && difficultySelect.addEventListener('change', updateDifficultyHelp);
+    updateDifficultyHelp();
 
     // Avisa si el servidor no tiene ninguna API de IA configurada.
     fetch('api/status.php', { credentials: 'same-origin' })
@@ -330,9 +353,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function describeSettings(settings) {
         if (!settingsBadge) return;
-        const dif = { amable: '😊 Amable', realista: '🧑‍💼 Realista', estricto: '🧐 Estricto' }[settings.dificultad] || '';
+        const dif = DIFFICULTY_LABELS[settings.dificultad] || '';
         const lang = settings.idioma === 'en' ? '🇺🇸 Inglés' : '🇪🇸 Español';
-        settingsBadge.textContent = `${dif} · ${lang}`;
+        settingsBadge.textContent = `${dif} · ${lang}${settings.presion ? ' · ⏳ Presión' : ''}`;
     }
 
     function setStepper(step) {
@@ -366,6 +389,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function resetChat() {
         stopSpeaking();
+        stopCountdown();
         btnPrint && btnPrint.classList.add('d-none');
         chatContainer.replaceChildren();
         finished = false;
@@ -381,9 +405,44 @@ document.addEventListener('DOMContentLoaded', () => {
             : questionNumber > 0 ? `Pregunta ${questionNumber}` : '';
     }
 
+    /* ---------- Modo presión: cuenta regresiva para responder ---------- */
+    let countdownId = null;
+
+    function stopCountdown() {
+        if (countdownId) clearInterval(countdownId);
+        countdownId = null;
+        if (countdownBadge) countdownBadge.classList.add('d-none');
+    }
+
+    function startCountdown() {
+        stopCountdown();
+        const settings = lastSettings || {};
+        if (!settings.presion || finished || busy) return;
+        let left = PRESSURE_SECONDS[settings.dificultad] || 20;
+        const render = () => {
+            if (!countdownBadge) return;
+            countdownBadge.textContent = `⏳ ${left}s para responder`;
+            countdownBadge.className = `badge ${left <= 5 ? 'text-bg-danger countdown-urgent' : 'text-bg-warning'}`;
+        };
+        render();
+        countdownId = setInterval(() => {
+            left -= 1;
+            if (left > 0) { render(); return; }
+            stopCountdown();
+            if (listening || busy || finished) return;
+            if (userInput.value.trim()) {
+                sendMessage();
+            } else {
+                appendMessage('user', '(Silencio: no respondiste a tiempo)');
+                askConsul('(Silencio: el solicitante no respondió a tiempo)');
+            }
+        }, 1000);
+    }
+
     async function sendMessage() {
         const text = userInput.value.trim();
         if (!text || busy || finished) return;
+        stopCountdown();
         stopSpeaking();
         appendMessage('user', text);
         userInput.value = '';
@@ -391,6 +450,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function askConsul(message) {
+        stopCountdown();
         busy = true;
         setControls(false);
         const typing = showTyping();
@@ -407,7 +467,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     appendMessage('assistant', data.reply);
                 }
                 updateCounter();
-                speak(data.reply);
+                // La cuenta regresiva empieza cuando el cónsul termina de hablar
+                speak(data.reply, finished ? null : startCountdown);
             } else {
                 appendMessage('error', data.error || 'Error desconocido.');
                 if (data.finished) finished = true;
@@ -460,6 +521,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function showForm() {
         stopSpeaking();
+        stopCountdown();
         stopTimer();
         setStepper(1);
         stepChat.classList.add('d-none');
@@ -571,6 +633,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btnMic.addEventListener('click', () => {
             if (listening) { recognition.stop(); return; }
             stopSpeaking();
+            stopCountdown();
             try {
                 recognition.start();
                 setListening(true);
@@ -594,6 +657,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (finalText.trim()) {
                 userInput.value = finalText.trim();
                 sendMessage();
+            } else {
+                startCountdown(); // no se entendió nada: vuelve a correr el tiempo
             }
         };
         recognition.onerror = (e) => {
@@ -607,6 +672,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     let spanishVoice = null;
+    let speechGen = 0;
     function pickVoice() {
         if (!('speechSynthesis' in window)) return;
         const voices = window.speechSynthesis.getVoices();
@@ -619,8 +685,10 @@ document.addEventListener('DOMContentLoaded', () => {
         window.speechSynthesis.onvoiceschanged = pickVoice;
     }
 
-    function speak(text) {
-        if (!('speechSynthesis' in window) || !voiceToggle || !voiceToggle.checked) return;
+    function speak(text, onDone) {
+        // Diferido: así corre después de que askConsul libere "busy"
+        const done = () => { if (typeof onDone === 'function') setTimeout(onDone, 0); };
+        if (!('speechSynthesis' in window) || !voiceToggle || !voiceToggle.checked) { done(); return; }
         window.speechSynthesis.cancel();
 
         let spoken = text;
@@ -634,9 +702,17 @@ document.addEventListener('DOMContentLoaded', () => {
             .replace(/^\s*-\s+/gm, '')
             .replace(/\s+/g, ' ')
             .trim();
-        if (!spoken) return;
+        if (!spoken) { done(); return; }
 
         const utterance = new SpeechSynthesisUtterance(spoken);
+        const gen = ++speechGen;
+        let called = false;
+        // Ignora callbacks de una locución cancelada (stopSpeaking)
+        const once = () => { if (!called && gen === speechGen) { called = true; done(); } };
+        utterance.onend = once;
+        utterance.onerror = once;
+        // Respaldo por si el navegador nunca dispara onend
+        setTimeout(once, Math.min(30000, 1500 + spoken.length * 90));
         utterance.lang = spanishVoice ? spanishVoice.lang : 'es-US';
         if (spanishVoice) utterance.voice = spanishVoice;
         utterance.rate = 0.95;
@@ -644,10 +720,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function stopSpeaking() {
+        speechGen++;
         if ('speechSynthesis' in window) window.speechSynthesis.cancel();
     }
 
     voiceToggle && voiceToggle.addEventListener('change', () => {
-        if (!voiceToggle.checked) stopSpeaking();
+        if (!voiceToggle.checked) {
+            stopSpeaking();
+            if (!busy && !finished && !countdownId && stepChat && !stepChat.classList.contains('d-none')) startCountdown();
+        }
     });
 });

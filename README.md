@@ -9,7 +9,14 @@ Practica tu entrevista de visa de turismo/negocios (B1/B2) con un cónsul simula
 - Perfil DS-160 por secciones, con campos de detalle que aparecen solo cuando hacen falta.
 - **Perfil de ejemplo** de un clic para probar, y opción de **recordar tus datos** en el navegador.
 - Buscador de países y selección por etiquetas.
-- **Tipo de cónsul:** amable, realista o estricto.
+- **4 niveles de cónsul:**
+  - 😊 *Amable*: paciente, para la primera práctica.
+  - 🧑‍💼 *Realista*: seco y con prisa; parte de la presunción de intención migratoria (214(b)).
+  - 🧐 *Estricto*: verifica cifras y fechas contra tu perfil, pone preguntas trampa e interrumpe.
+  - 🔥 *Implacable*: su postura por defecto es rechazar; presiona y repite preguntas para pillarte.
+- **Modo presión:** cuenta regresiva para cada respuesta (30/20/15/10 s según el nivel). Si te quedas callado, el cónsul lo nota.
+- El cónsul **interrumpe** si hablas de más (el límite de palabras depende del nivel).
+- Informe final con **momento clave**, **respuestas que te perjudicaron** y cómo debiste responder.
 - **Idioma:** entrevista en español o en inglés (el informe siempre en español).
 - Entrevista adaptativa: una pregunta a la vez, repreguntas ante contradicciones y un límite de turnos.
 - Voz: dictado por micrófono (Chrome/Edge) y voz del cónsul (síntesis del navegador).

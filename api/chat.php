@@ -7,8 +7,15 @@ set_time_limit(150);
 
 require_once __DIR__ . '/../config/api_config.php';
 require_once __DIR__ . '/../src/AiConsulService.php';
+require_once __DIR__ . '/../src/InterviewPrompt.php';
 
 use App\AiConsulService;
+use App\InterviewPrompt;
+
+function str_word_count_utf8(string $text): int
+{
+    return count(preg_split('/\s+/u', trim($text), -1, PREG_SPLIT_NO_EMPTY));
+}
 
 if (!function_exists('curl_init')) {
     json_response(['error' => 'La extensión cURL de PHP no está habilitada en este servidor.'], 500);
@@ -40,6 +47,16 @@ if ($userMsg !== '') {
 }
 
 $turns = $interview['turns'] + ($userMsg !== '' ? 1 : 0);
+
+// Si la respuesta es demasiado larga para el nivel elegido, se le indica al
+// cónsul (solo para este turno) que interrumpa, como pasa en la ventanilla.
+$maxWords = InterviewPrompt::maxWordsFor($interview['settings'] ?? []);
+if ($maxWords > 0 && $userMsg !== '' && str_word_count_utf8($userMsg) > $maxWords) {
+    $messages[] = [
+        'role'    => 'system',
+        'content' => 'Nota: la última respuesta del solicitante fue demasiado larga. Interrúmpelo con firmeza (por ejemplo, "Solo responda lo que le pregunto") antes de tu siguiente pregunta, y tenlo en cuenta en la evaluación.',
+    ];
+}
 if ($turns >= MAX_USER_TURNS) {
     // Nota temporal (no se guarda en el historial) para cerrar la entrevista.
     $messages[] = [

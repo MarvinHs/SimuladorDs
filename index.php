@@ -16,7 +16,7 @@
     <meta name="theme-color" content="#1e3a8a">
     <title>Simulador Consular DS-160 | Perfil Personalizado</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/style.css?v=4">
+    <link rel="stylesheet" href="assets/css/style.css?v=5">
 </head>
 <body>
 <div class="container py-5 app-container">
@@ -490,8 +490,10 @@
                         <select id="ajuste_dificultad" class="form-select" data-setting="dificultad">
                             <option value="amable">😊 Amable: ideal para la primera práctica</option>
                             <option value="realista" selected>🧑‍💼 Realista: como en la ventanilla</option>
-                            <option value="estricto">🧐 Estricto: repregunta todo</option>
+                            <option value="estricto">🧐 Estricto: repregunta todo y busca contradicciones</option>
+                            <option value="implacable">🔥 Implacable: presiona, interrumpe y rechaza ante la duda</option>
                         </select>
+                        <div id="dificultad-ayuda" class="form-text"></div>
                     </div>
                     <div class="col-md-6 mb-3">
                         <label for="ajuste_idioma" class="form-label fw-semibold">Idioma de la entrevista</label>
@@ -499,6 +501,13 @@
                             <option value="es" selected>🇪🇸 Español</option>
                             <option value="en">🇺🇸 Inglés (el informe final será en español)</option>
                         </select>
+                    </div>
+                    <div class="col-12 mb-2">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="ajuste_presion" data-setting="presion" role="switch">
+                            <label class="form-check-label fw-semibold" for="ajuste_presion">⏳ Modo presión: tiempo límite para responder cada pregunta</label>
+                        </div>
+                        <div class="form-text">Si no respondes a tiempo, el cónsul lo toma como silencio o nerviosismo. Así practicas responder rápido y sin titubear.</div>
                     </div>
                     <div class="col-12">
                         <div class="form-check">
@@ -530,6 +539,7 @@
                         <span id="question-counter" class="badge text-bg-light border"></span>
                         <span id="interview-timer" class="badge text-bg-light border" title="Las entrevistas reales suelen durar entre 2 y 5 minutos">⏱️ 0:00</span>
                         <span id="settings-badge" class="badge text-bg-light border"></span>
+                        <span id="answer-countdown" class="badge d-none" aria-live="polite"></span>
                     </div>
                 </div>
                 <div class="form-check form-switch">
@@ -560,6 +570,6 @@
     Herramienta de práctica independiente. No está afiliada al Gobierno de los EE. UU.
 </footer>
 
-<script src="assets/js/voice_engine.js?v=4"></script>
+<script src="assets/js/voice_engine.js?v=5"></script>
 </body>
 </html>
