@@ -3,7 +3,7 @@
 // Envía la respuesta del solicitante al cónsul (IA) y devuelve su réplica.
 // Evita que warnings/notices de PHP se mezclen con el JSON de respuesta.
 ini_set('display_errors', '0');
-set_time_limit(90);
+set_time_limit(150);
 
 require_once __DIR__ . '/../config/api_config.php';
 require_once __DIR__ . '/../src/AiConsulService.php';

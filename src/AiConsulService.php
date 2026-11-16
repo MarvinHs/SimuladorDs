@@ -21,7 +21,8 @@ class AiConsulService
             'name'      => 'Google Gemini',
             'key_env'   => 'GEMINI_API_KEY',
             'model_env' => 'GEMINI_MODEL',
-            'model'     => 'gemini-flash-latest',
+            // Lista separada por comas: si un modelo está saturado se usa el siguiente
+            'model'     => 'gemini-3.5-flash,gemini-flash-latest,gemini-3.5-flash-lite',
             'url'       => 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
             'format'    => 'openai',
         ],
@@ -82,10 +83,15 @@ class AiConsulService
             }
             $cfg['id'] = $id;
             $cfg['key'] = $key;
-            $cfg['model'] = app_env($cfg['model_env'], $cfg['model']);
             // Permite apuntar a otra URL compatible (proxy, servidor de pruebas…)
             $cfg['url'] = app_env(strtoupper($id) . '_API_URL', $cfg['url']);
-            $chain[] = $cfg;
+            // Cada modelo de la lista es un eslabón más de la cadena de respaldo
+            $models = array_filter(array_map('trim', explode(',', app_env($cfg['model_env'], $cfg['model']))));
+            foreach ($models as $model) {
+                $cfg['model'] = $model;
+                $cfg['slot'] = $id . '_' . preg_replace('/[^a-z0-9.-]+/i', '_', $model);
+                $chain[] = $cfg;
+            }
         }
         return $chain;
     }
@@ -99,20 +105,23 @@ class AiConsulService
 
         // Los proveedores que fallaron hace poco pasan al final de la fila,
         // para no hacer esperar al usuario en cada mensaje.
-        $healthy = array_filter($this->chain, fn ($p) => !self::inCooldown($p['id']));
-        $cooling = array_filter($this->chain, fn ($p) => self::inCooldown($p['id']));
+        $healthy = array_values(array_filter($this->chain, fn ($p) => !self::inCooldown($p['slot'])));
+        $cooling = array_values(array_filter($this->chain, fn ($p) => self::inCooldown($p['slot'])));
         $chain = array_merge($healthy, $cooling);
 
         $lastError = 'Error desconocido del servicio de IA.';
-        foreach ($chain as $provider) {
-            $result = $this->callWithRetry($provider, $messages);
+        $total = count($chain);
+        foreach ($chain as $i => $provider) {
+            // Solo se reintenta el mismo modelo si es la última opción;
+            // si hay alternativas, es más rápido pasar a la siguiente.
+            $result = $this->callWithRetry($provider, $messages, $i === $total - 1);
             if (isset($result['reply'])) {
-                self::setCooldown($provider['id'], 0);
-                return $result + ['provider' => $provider['name']];
+                self::setCooldown($provider['slot'], 0);
+                return $result + ['provider' => $provider['name'] . ' (' . $provider['model'] . ')'];
             }
             $lastError = $result['error'];
-            self::setCooldown($provider['id'], self::COOLDOWN_SECONDS);
-            error_log("[IA] {$provider['name']} falló: {$lastError}");
+            self::setCooldown($provider['slot'], self::COOLDOWN_SECONDS);
+            error_log("[IA] {$provider['name']} / {$provider['model']} falló: {$lastError}");
         }
         return ['error' => $lastError];
     }
@@ -142,9 +151,10 @@ class AiConsulService
         @file_put_contents($file, (string) (time() + $seconds), LOCK_EX);
     }
 
-    private function callWithRetry(array $provider, array $messages): array
+    private function callWithRetry(array $provider, array $messages, bool $allowRetry = true): array
     {
-        for ($attempt = 1; $attempt <= 2; $attempt++) {
+        $maxAttempts = $allowRetry ? 2 : 1;
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
             [$status, $body, $curlError] = $provider['format'] === 'anthropic'
                 ? $this->post($provider['url'], $this->anthropicPayload($provider, $messages), [
                     'x-api-key: ' . $provider['key'],
@@ -155,7 +165,7 @@ class AiConsulService
                 ]);
 
             if ($body === false) {
-                if ($attempt === 2) {
+                if ($attempt === $maxAttempts) {
                     return ['error' => "No se pudo conectar con {$provider['name']}: {$curlError}"];
                 }
                 continue;
@@ -173,7 +183,7 @@ class AiConsulService
             }
 
             // Reintento único ante saturación o errores temporales
-            if (($status === 429 || $status === 529 || $status >= 500) && $attempt === 1) {
+            if (($status === 429 || $status === 529 || $status >= 500) && $attempt < $maxAttempts) {
                 sleep(2);
                 continue;
             }
@@ -201,7 +211,8 @@ class AiConsulService
 
         if ($provider['id'] === 'gemini') {
             // Los Gemini recientes ya no aceptan temperature/top_p.
-            $payload['reasoning_effort'] = 'low';
+            // Razonamiento mínimo: respuestas más rápidas para la conversación.
+            $payload['reasoning_effort'] = app_env('GEMINI_REASONING', 'minimal');
             $payload['max_tokens'] = 2000;
         } elseif ($provider['id'] === 'openai') {
             $payload['max_completion_tokens'] = 2000;
@@ -270,7 +281,7 @@ class AiConsulService
             CURLOPT_POSTFIELDS     => json_encode($payload, JSON_UNESCAPED_UNICODE),
             CURLOPT_HTTPHEADER     => array_merge(['Content-Type: application/json'], $headers),
             CURLOPT_CONNECTTIMEOUT => 10,
-            CURLOPT_TIMEOUT        => 45,
+            CURLOPT_TIMEOUT        => 30,
             // Verificación SSL ACTIVADA. Si en XAMPP falla, define
             // CURL_CA_BUNDLE en .env apuntando a un cacert.pem.
             CURLOPT_SSL_VERIFYPEER => true,
