@@ -31,14 +31,17 @@ if (isset($profile['fecha_viaje'], $profile['fecha_regreso'])
     json_response(['success' => false, 'error' => 'La fecha de regreso no puede ser anterior a la de salida.'], 422);
 }
 
+$settings = InterviewPrompt::sanitizeSettings($input['ajustes'] ?? []);
+
 session_regenerate_id(true);
 $_SESSION['interview'] = [
     'history'  => [
-        ['role' => 'system', 'content' => InterviewPrompt::systemPrompt($profile, date('Y-m-d'))],
+        ['role' => 'system', 'content' => InterviewPrompt::systemPrompt($profile, date('Y-m-d'), $settings)],
         ['role' => 'user', 'content' => '(El solicitante se acerca a la ventanilla y entrega su pasaporte.)'],
     ],
     'turns'    => 0,
     'finished' => false,
+    'settings' => $settings,
 ];
 
 json_response(['success' => true, 'maxTurns' => MAX_USER_TURNS]);

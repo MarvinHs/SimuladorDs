@@ -34,9 +34,8 @@ function app_env(string $key, string $default = ''): string
     return ($value === false || $value === '') ? $default : $value;
 }
 
-define('GROQ_API_KEY', app_env('GROQ_API_KEY'));
-define('GROQ_MODEL', app_env('GROQ_MODEL', 'openai/gpt-oss-120b'));
-define('GROQ_API_URL', app_env('GROQ_API_URL','https://api.groq.com/openai/v1/chat/completions'));
+// Las claves de IA (GEMINI_API_KEY, GROQ_API_KEY, ANTHROPIC_API_KEY,
+// OPENAI_API_KEY) y AI_PROVIDER se leen en src/AiConsulService.php.
 
 // Ruta opcional a un bundle de certificados (p. ej. XAMPP sin cacert.pem).
 define('CURL_CA_BUNDLE', app_env('CURL_CA_BUNDLE'));

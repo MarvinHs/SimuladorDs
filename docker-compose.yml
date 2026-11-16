@@ -4,7 +4,7 @@ services:
     container_name: simulador-consular
     ports:
       - "8080:80"
-    environment:
-      GROQ_API_KEY: ${GROQ_API_KEY:?Define GROQ_API_KEY en el archivo .env}
-      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-120b}
+    # Las claves de IA se leen del archivo .env (ver .env.example)
+    env_file:
+      - .env
     restart: unless-stopped

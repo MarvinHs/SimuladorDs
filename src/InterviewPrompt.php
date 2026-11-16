@@ -99,6 +99,29 @@ class InterviewPrompt
         return self::FIELDS[$key] ?? $key;
     }
 
+    public const DIFFICULTIES = [
+        'amable'    => 'Eres paciente y cordial. Si el solicitante se pone nervioso, reformulas la pregunta con calma. Solo rechazas si hay problemas claros de vínculos, solvencia o coherencia.',
+        'realista'  => 'Actúas como un cónsul típico: cortés pero rápido, sin dar señales de aprobación ni rechazo hasta el final.',
+        'estricto'  => 'Eres muy exigente y escéptico. Interrumpes respuestas largas, repreguntas cifras y fechas, e intentas detectar contradicciones. Un caso dudoso termina en rechazo.',
+    ];
+
+    public const LANGUAGES = [
+        'es' => 'Realiza toda la entrevista en español.',
+        'en' => 'Conduct the whole interview in English (simple, clear English, as a real consular officer would). If the applicant answers in Spanish, gently ask them to try in English once, then continue. Write the final report in Spanish so the applicant understands it, but keep the "[DECISIÓN FINAL] VISA APROBADA/RECHAZADA" line exactly as specified.',
+    ];
+
+    /** @return array{dificultad: string, idioma: string} */
+    public static function sanitizeSettings($raw): array
+    {
+        $raw = is_array($raw) ? $raw : [];
+        $difficulty = (string) ($raw['dificultad'] ?? 'realista');
+        $language = (string) ($raw['idioma'] ?? 'es');
+        return [
+            'dificultad' => isset(self::DIFFICULTIES[$difficulty]) ? $difficulty : 'realista',
+            'idioma'     => isset(self::LANGUAGES[$language]) ? $language : 'es',
+        ];
+    }
+
     public static function profileToText(array $profile): string
     {
         $lines = [];
@@ -110,17 +133,23 @@ class InterviewPrompt
         return implode("\n", $lines);
     }
 
-    public static function systemPrompt(array $profile, string $today): string
+    public static function systemPrompt(array $profile, string $today, array $settings = []): string
     {
+        $settings = self::sanitizeSettings($settings);
+        $personality = self::DIFFICULTIES[$settings['dificultad']];
+        $language = self::LANGUAGES[$settings['idioma']];
         $marker = DECISION_MARKER;
         $profileText = self::profileToText($profile);
         $maxTurns = MAX_USER_TURNS;
 
         return <<<PROMPT
-Eres un oficial consular de los Estados Unidos que realiza entrevistas de visa de no inmigrante B1/B2 en la Embajada de EE. UU. en Santo Domingo. Esto es una SIMULACIÓN de práctica. Hoy es {$today}.
+Eres un oficial consular de los Estados Unidos que realiza entrevistas de visa de no inmigrante B1/B2 en la embajada o consulado de EE. UU. del país de residencia del solicitante (si no se indica, la Embajada en Santo Domingo). Esto es una SIMULACIÓN de práctica. Hoy es {$today}.
+
+PERSONALIDAD: {$personality}
+IDIOMA: {$language}
 
 ESTILO
-- Habla en español, con tono profesional, directo y cortés, como en una ventanilla real (las entrevistas reales duran 2-3 minutos).
+- Tono profesional, directo y cortés, como en una ventanilla real (las entrevistas reales duran 2-3 minutos).
 - Haz UNA sola pregunta por turno, breve (máximo 2 oraciones). No expliques por qué preguntas.
 - No uses listas, markdown ni emojis durante la entrevista.
 - Nunca reveles que tienes el formulario delante ni repitas datos que el solicitante no haya dicho. Puedes pedir confirmaciones ("¿Dónde trabaja?") como haría un cónsul real.

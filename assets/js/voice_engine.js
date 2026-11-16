@@ -20,7 +20,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const questionCounter = $('question-counter');
     const inputGroup = $('chat-input-group');
 
+    const btnPrint = $('btn-print');
+    const timerBadge = $('interview-timer');
+    const settingsBadge = $('settings-badge');
+    const STORAGE_KEY = 'simuladords:perfil';
+
     let lastProfile = null;
+    let lastSettings = null;
+    let timerId = null;
+    let timerStart = 0;
     let busy = false;
     let finished = false;
     let questionNumber = 0;
@@ -113,6 +121,121 @@ document.addEventListener('DOMContentLoaded', () => {
     departure && departure.addEventListener('change', validateDates);
     returnDate && returnDate.addEventListener('change', validateDates);
 
+    /* ---------- Perfil de ejemplo, limpiar y recordar datos ---------- */
+
+    const EXAMPLE_PROFILE = {
+        nombre: 'Laura Martínez Peña', estado_civil: 'Casado/a', hijos: 'Sí',
+        nombre_padre: 'Ramón Martínez', padre_eeuu: 'No', nombre_madre: 'Carmen Peña', madre_eeuu: 'No',
+        residencia_actual: 'República Dominicana', familiares_eeuu: 'Sí',
+        detalle_familiares_eeuu: 'Una prima en Nueva York, ciudadana estadounidense',
+        ocupacion: 'Contadora sénior', empresa: 'Distribuidora del Caribe, S.R.L.', antiguedad: '2017-03-01',
+        ingresos: 'RD$95,000', otros_ingresos: 'Asesorías contables, aprox. RD$15,000 al mes',
+        estudios_actuales: 'No', vacaciones_autorizadas: 'Sí', detalle_vacaciones: '10 días en julio, aprobados por RR. HH.',
+        motivo_viaje: 'Turismo con mi familia (parques de Orlando)', destino: 'Orlando, Florida', tiempo_estadia: '8 días',
+        financiacion: 'Ahorros propios y de mi esposo', presupuesto: 'US$4,500', ahorros: 'US$7,000',
+        hospedaje: 'Hotel reservado cerca de los parques', invitante: 'No aplica',
+        motivo_regreso: 'Mi empleo, mis dos hijos en la escuela y mi apartamento propio',
+        acompanantes: 'Con mi esposo y mis dos hijos', viajes_eeuu: 'No',
+        negacion_visa: 'No', negacion_entrada: 'No', antecedentes_judiciales: 'No', overstay: 'No',
+    };
+
+    function nextMonthDate(offsetDays) {
+        const d = new Date();
+        d.setDate(d.getDate() + offsetDays);
+        return d.toISOString().slice(0, 10);
+    }
+
+    function fillForm(values, countries = []) {
+        Object.entries(values).forEach(([key, value]) => {
+            const field = form.elements[key];
+            if (field && 'value' in field) field.value = value;
+        });
+        if (countriesSelect) {
+            [...countriesSelect.options].forEach((o) => { o.selected = countries.includes(o.value); });
+        }
+        if (noneCheckbox) noneCheckbox.checked = values.ningun_pais === 'Sí';
+        updateConditionals();
+        renderCountryChips();
+        validateDates();
+    }
+
+    $('btn-example') && $('btn-example').addEventListener('click', () => {
+        fillForm({ ...EXAMPLE_PROFILE, fecha_viaje: nextMonthDate(60), fecha_regreso: nextMonthDate(68) }, ['Panamá', 'Colombia']);
+        setStatus('Perfil de ejemplo cargado. Puedes modificarlo o empezar la entrevista.', 'success');
+    });
+
+    $('btn-clear') && $('btn-clear').addEventListener('click', () => {
+        if (!confirmClear()) return;
+        form.reset();
+        renderCountryChips();
+        updateConditionals();
+        forgetDraft();
+        setStatus('');
+    });
+
+    function confirmClear() {
+        // Evita window.confirm (bloquea la página); se usa doble clic de seguridad.
+        const btn = $('btn-clear');
+        if (btn.dataset.armed === '1') { btn.dataset.armed = ''; btn.textContent = '🧹 Limpiar'; return true; }
+        btn.dataset.armed = '1';
+        btn.textContent = '⚠️ ¿Seguro? Pulsa otra vez';
+        setTimeout(() => { btn.dataset.armed = ''; btn.textContent = '🧹 Limpiar'; }, 3000);
+        return false;
+    }
+
+    const rememberBox = $('recordar_datos');
+
+    function storage() {
+        try { return window.localStorage; } catch { return null; }
+    }
+
+    function saveDraft() {
+        const store = storage();
+        if (!store || !rememberBox || !rememberBox.checked) return;
+        const values = {};
+        [...form.elements].forEach((el) => {
+            if (!el.name || el.name === 'paises_visitados[]') return;
+            if (el.type === 'checkbox') values[el.name] = el.checked ? 'Sí' : '';
+            else values[el.name] = el.value;
+        });
+        const countries = countriesSelect ? [...countriesSelect.selectedOptions].map((o) => o.value) : [];
+        const settings = collectSettings();
+        try { store.setItem(STORAGE_KEY, JSON.stringify({ values, countries, settings })); } catch { /* cuota llena */ }
+    }
+
+    function forgetDraft() {
+        const store = storage();
+        try { store && store.removeItem(STORAGE_KEY); } catch { /* sin acceso */ }
+    }
+
+    function loadDraft() {
+        const store = storage();
+        if (!store) return;
+        let draft = null;
+        try { draft = JSON.parse(store.getItem(STORAGE_KEY) || 'null'); } catch { draft = null; }
+        if (!draft || !draft.values) return;
+        fillForm(draft.values, draft.countries || []);
+        if (draft.settings) {
+            document.querySelectorAll('[data-setting]').forEach((el) => {
+                if (draft.settings[el.dataset.setting]) el.value = draft.settings[el.dataset.setting];
+            });
+        }
+        if (rememberBox) rememberBox.checked = true;
+        setStatus('Se cargaron los datos guardados en este navegador.', 'secondary');
+    }
+
+    if (rememberBox) {
+        rememberBox.addEventListener('change', () => (rememberBox.checked ? saveDraft() : forgetDraft()));
+    }
+    form && form.addEventListener('input', saveDraft);
+    form && form.addEventListener('change', saveDraft);
+
+    function collectSettings() {
+        const settings = {};
+        document.querySelectorAll('[data-setting]').forEach((el) => { settings[el.dataset.setting] = el.value; });
+        return settings;
+    }
+
     function collectProfile() {
         const profile = {};
         const data = new FormData(form);
@@ -139,9 +262,22 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             if (!validateDates() || !form.reportValidity()) return;
             lastProfile = collectProfile();
-            await startInterview(lastProfile);
+            lastSettings = collectSettings();
+            saveDraft();
+            await startInterview(lastProfile, lastSettings);
         });
     }
+
+    loadDraft();
+
+    // Avisa si el servidor no tiene ninguna API de IA configurada.
+    fetch('api/status.php', { credentials: 'same-origin' })
+        .then((r) => r.json())
+        .then((st) => {
+            if (!st.ready) $('config-warning') && $('config-warning').classList.remove('d-none');
+            else console.info('IA disponible:', st.providers.map((p) => `${p.name} (${p.model})`).join(' → '));
+        })
+        .catch(() => { /* sin estado: no bloquea el uso */ });
 
     /* =========================================================
      * 2. ENTREVISTA
@@ -164,11 +300,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function startInterview(profile) {
+    async function startInterview(profile, settings) {
         btnStart && (btnStart.disabled = true);
         setStatus('<span class="spinner-border spinner-border-sm me-2"></span>Preparando la ventanilla consular...', 'primary');
         try {
-            const { data } = await postJson('api/start.php', { perfil: profile });
+            const { data } = await postJson('api/start.php', { perfil: profile, ajustes: settings });
             if (!data.success) {
                 setStatus(escapeHtml(data.error || 'Error desconocido al procesar.'), 'danger');
                 if (data.missing && data.missing[0] && $(data.missing[0])) $(data.missing[0]).focus();
@@ -177,6 +313,9 @@ document.addEventListener('DOMContentLoaded', () => {
             maxTurns = data.maxTurns || maxTurns;
             setStatus('');
             resetChat();
+            describeSettings(settings);
+            setStepper(2);
+            startTimer();
             stepUpload.classList.add('d-none');
             stepChat.classList.remove('d-none');
             stepChat.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -189,8 +328,45 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function describeSettings(settings) {
+        if (!settingsBadge) return;
+        const dif = { amable: '😊 Amable', realista: '🧑‍💼 Realista', estricto: '🧐 Estricto' }[settings.dificultad] || '';
+        const lang = settings.idioma === 'en' ? '🇺🇸 Inglés' : '🇪🇸 Español';
+        settingsBadge.textContent = `${dif} · ${lang}`;
+    }
+
+    function setStepper(step) {
+        [1, 2, 3].forEach((n) => {
+            const li = $(`stepper-${n}`);
+            if (!li) return;
+            li.classList.toggle('active', n === step);
+            li.classList.toggle('done', n < step);
+        });
+    }
+
+    function formatElapsed() {
+        const secs = Math.floor((Date.now() - timerStart) / 1000);
+        return `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+    }
+
+    function startTimer() {
+        stopTimer();
+        timerStart = Date.now();
+        if (!timerBadge) return;
+        timerBadge.textContent = '⏱️ 0:00';
+        timerId = setInterval(() => { timerBadge.textContent = `⏱️ ${formatElapsed()}`; }, 1000);
+    }
+
+    function stopTimer() {
+        if (!timerId) return;
+        clearInterval(timerId);
+        timerId = null;
+        if (timerBadge) timerBadge.textContent = `⏱️ ${formatElapsed()}`;
+    }
+
     function resetChat() {
         stopSpeaking();
+        btnPrint && btnPrint.classList.add('d-none');
         chatContainer.replaceChildren();
         finished = false;
         questionNumber = 0;
@@ -244,6 +420,9 @@ document.addEventListener('DOMContentLoaded', () => {
             busy = false;
             if (finished) {
                 inputGroup.classList.add('d-none');
+                stopTimer();
+                setStepper(3);
+                btnPrint && btnPrint.classList.remove('d-none');
             } else {
                 setControls(true);
             }
@@ -261,7 +440,7 @@ document.addEventListener('DOMContentLoaded', () => {
     btnRestart && btnRestart.addEventListener('click', () => {
         if (busy) return;
         if (!lastProfile) { showForm(); return; }
-        startInterview(lastProfile);
+        startInterview(lastProfile, lastSettings || collectSettings());
     });
 
     btnEdit && btnEdit.addEventListener('click', () => {
@@ -269,8 +448,20 @@ document.addEventListener('DOMContentLoaded', () => {
         showForm();
     });
 
+    btnPrint && btnPrint.addEventListener('click', () => {
+        const meta = $('print-meta');
+        if (meta) {
+            const who = lastProfile && lastProfile.nombre ? lastProfile.nombre : 'Solicitante';
+            const date = new Date().toLocaleString('es-DO', { dateStyle: 'long', timeStyle: 'short' });
+            meta.textContent = `${who} · ${date} · Duración: ${timerBadge ? timerBadge.textContent.replace('⏱️', '').trim() : ''} · ${settingsBadge ? settingsBadge.textContent : ''}`;
+        }
+        window.print();
+    });
+
     function showForm() {
         stopSpeaking();
+        stopTimer();
+        setStepper(1);
         stepChat.classList.add('d-none');
         stepUpload.classList.remove('d-none');
         stepUpload.scrollIntoView({ behavior: 'smooth', block: 'start' });

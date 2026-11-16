@@ -16,19 +16,35 @@
     <meta name="theme-color" content="#1e3a8a">
     <title>Simulador Consular DS-160 | Perfil Personalizado</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/style.css?v=2">
+    <link rel="stylesheet" href="assets/css/style.css?v=4">
 </head>
 <body>
 <div class="container py-5 app-container">
-    <div class="text-center mb-5">
+    <header class="hero text-center mb-4">
+        <span class="hero-badge">Visa B1/B2 · Práctica con IA</span>
         <h1 class="hero-title">🏛️ Simulador de Entrevista Consular</h1>
-        <p class="text-muted">Completa los datos de tu perfil DS-160 para generar una simulación personalizada con IA.</p>
+        <p class="hero-subtitle">Completa tu perfil DS-160, practica la entrevista por texto o por voz y recibe un informe con tus puntos fuertes, débiles y recomendaciones.</p>
+        <ol class="stepper" aria-label="Progreso">
+            <li id="stepper-1" class="active"><span>1</span> Perfil</li>
+            <li id="stepper-2"><span>2</span> Entrevista</li>
+            <li id="stepper-3"><span>3</span> Resultado</li>
+        </ol>
+    </header>
+
+    <div id="config-warning" class="alert alert-warning d-none" role="alert">
+        <strong>⚠️ Falta configurar la IA.</strong> El servidor no tiene ninguna API key. Crea el archivo <code>.env</code> a partir de <code>.env.example</code> y coloca al menos <code>GEMINI_API_KEY</code> o <code>GROQ_API_KEY</code>.
     </div>
 
     <!-- PASO 1: FORMULARIO DE PERFIL -->
     <div id="step-upload" class="card p-4 mb-4 shadow-sm">
         <div class="card-body">
-            <h4 class="card-title mb-4 text-primary border-bottom pb-2">📋 Cuestionario de Perfil DS-160</h4>
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4 border-bottom pb-2">
+                <h4 class="card-title text-primary mb-0">📋 Cuestionario de Perfil DS-160</h4>
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="button" id="btn-example" class="btn btn-sm btn-outline-primary" title="Llena el formulario con un perfil ficticio para probar">✨ Usar perfil de ejemplo</button>
+                    <button type="button" id="btn-clear" class="btn btn-sm btn-outline-secondary">🧹 Limpiar</button>
+                </div>
+            </div>
 
             <form id="upload-form">
                 <h5 class="text-secondary mt-4 mb-3">1. Información personal</h5>
@@ -467,8 +483,33 @@
                     </div>
                 </div>
 
+                <h5 class="text-secondary mt-4 mb-3">7. Ajustes de la simulación</h5>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="ajuste_dificultad" class="form-label fw-semibold">Tipo de cónsul</label>
+                        <select id="ajuste_dificultad" class="form-select" data-setting="dificultad">
+                            <option value="amable">😊 Amable: ideal para la primera práctica</option>
+                            <option value="realista" selected>🧑‍💼 Realista: como en la ventanilla</option>
+                            <option value="estricto">🧐 Estricto: repregunta todo</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="ajuste_idioma" class="form-label fw-semibold">Idioma de la entrevista</label>
+                        <select id="ajuste_idioma" class="form-select" data-setting="idioma">
+                            <option value="es" selected>🇪🇸 Español</option>
+                            <option value="en">🇺🇸 Inglés (el informe final será en español)</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="recordar_datos">
+                            <label class="form-check-label" for="recordar_datos">Recordar mis datos en este navegador <small class="text-muted">(no lo actives en una computadora compartida)</small></label>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="alert alert-info mt-4" role="note">
-                    <strong>Importante:</strong> utiliza información veraz y coherente con tu solicitud. Este simulador es una herramienta de práctica: no está afiliado al Departamento de Estado ni garantiza la aprobación de una visa. Tus respuestas se envían a un servicio de IA (Groq) solo para generar la entrevista y no se guardan en este servidor.
+                    <strong>Importante:</strong> utiliza información veraz y coherente con tu solicitud. Este simulador es una herramienta de práctica: no está afiliado al Departamento de Estado ni garantiza la aprobación de una visa. Tus respuestas se envían a un servicio de IA solo para generar la entrevista y no se guardan en este servidor.
                 </div>
                 <div class="d-grid mt-4">
                     <button type="submit" id="btn-start" class="btn btn-primary btn-lg py-3">🚀 Generar cónsul y empezar entrevista</button>
@@ -481,15 +522,24 @@
     <!-- PASO 2: CHAT Y VOZ -->
     <div id="step-chat" class="card p-4 d-none shadow-sm">
         <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+            <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom no-print">
                 <div>
-                    <h5 class="card-title text-primary mb-0">Ventanilla Consular Activa</h5>
-                    <small class="text-muted">Responde con naturalidad, claridad y brevedad. <span id="question-counter" class="badge text-bg-light border ms-1"></span></small>
+                    <h5 class="card-title text-primary mb-0">🪟 Ventanilla consular</h5>
+                    <small class="text-muted">Responde con naturalidad, claridad y brevedad.</small>
+                    <div class="d-flex flex-wrap gap-1 mt-1">
+                        <span id="question-counter" class="badge text-bg-light border"></span>
+                        <span id="interview-timer" class="badge text-bg-light border" title="Las entrevistas reales suelen durar entre 2 y 5 minutos">⏱️ 0:00</span>
+                        <span id="settings-badge" class="badge text-bg-light border"></span>
+                    </div>
                 </div>
                 <div class="form-check form-switch">
                     <input class="form-check-input" type="checkbox" id="voice-toggle" name="voice_toggle" checked>
                     <label class="form-check-label fw-semibold text-secondary" for="voice-toggle">🔊 Voz del cónsul</label>
                 </div>
+            </div>
+            <div class="print-only print-header">
+                <h2>Informe de práctica: entrevista consular simulada</h2>
+                <p id="print-meta"></p>
             </div>
             <div id="chat-container" class="chat-container mb-3 shadow-sm" aria-live="polite" aria-label="Conversación de entrevista"></div>
             <div id="chat-input-group" class="input-group">
@@ -498,6 +548,7 @@
                 <button type="button" id="btn-send" class="btn btn-success px-4" disabled>Enviar</button>
             </div>
             <div class="d-flex flex-wrap gap-2 justify-content-end mt-3">
+                <button type="button" id="btn-print" class="btn btn-outline-success btn-sm d-none">📄 Descargar informe</button>
                 <button type="button" id="btn-edit" class="btn btn-outline-secondary btn-sm">✏️ Editar perfil</button>
                 <button type="button" id="btn-restart" class="btn btn-outline-primary btn-sm">🔄 Repetir entrevista</button>
             </div>
@@ -505,6 +556,10 @@
     </div>
 </div>
 
-<script src="assets/js/voice_engine.js?v=2"></script>
+<footer class="text-center text-muted small pb-4 no-print">
+    Herramienta de práctica independiente. No está afiliada al Gobierno de los EE. UU.
+</footer>
+
+<script src="assets/js/voice_engine.js?v=4"></script>
 </body>
 </html>

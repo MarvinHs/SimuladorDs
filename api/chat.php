@@ -52,7 +52,7 @@ if ($turns >= MAX_USER_TURNS) {
 // congelar otras peticiones del mismo usuario.
 session_write_close();
 
-$ai = new AiConsulService(GROQ_API_KEY, GROQ_MODEL, GROQ_API_URL, CURL_CA_BUNDLE);
+$ai = new AiConsulService(CURL_CA_BUNDLE);
 $result = $ai->sendChat($messages);
 
 if (!isset($result['reply'])) {
@@ -84,4 +84,5 @@ json_response([
     'approved' => $approved,
     'turns'    => $turns,
     'maxTurns' => MAX_USER_TURNS,
+    'provider' => $result['provider'] ?? null,
 ]);
