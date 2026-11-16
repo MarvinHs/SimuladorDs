@@ -79,6 +79,20 @@ if (!isset($result['reply'])) {
 $reply = $result['reply'];
 $finished = mb_strpos($reply, DECISION_MARKER) !== false;
 
+// Algunos modelos olvidan la etiqueta: si el mensaje es claramente la
+// decisión final (veredicto al inicio o el informe con la puntuación), se
+// normaliza para que la interfaz muestre la tarjeta de decisión.
+if (!$finished) {
+    $verdictAtStart = preg_match('/^\W*(?:\[?\s*DECISI[OÓ]N\s+FINAL\s*\]?\W*)?(?:VISA\s+)?(APROBADA|RECHAZADA)\b/iu', $reply);
+    $hasReport = preg_match('/Puntuaci[oó]n de preparaci[oó]n/iu', $reply)
+        && preg_match('/VISA\s+(APROBADA|RECHAZADA)/iu', $reply);
+    if ($verdictAtStart || $hasReport) {
+        $reply = preg_replace('/^\W*\[?\s*DECISI[OÓ]N\s+FINAL\s*\]?\s*/iu', '', $reply);
+        $reply = DECISION_MARKER . ' ' . ltrim($reply);
+        $finished = true;
+    }
+}
+
 // Reabre la sesión para guardar el progreso solo si la llamada tuvo éxito,
 // así un error no deja el historial a medias.
 session_start();
