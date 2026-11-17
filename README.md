@@ -100,3 +100,33 @@ config/api_config.php     Configuración, sesión y utilidades
 ## Privacidad
 
 Los datos del perfil y las respuestas se guardan solo en la sesión de PHP mientras dura la entrevista, y se envían al proveedor de IA configurado para generar las preguntas. Si activas "Recordar mis datos", el perfil se guarda solo en tu navegador (localStorage) y se borra con el botón "Limpiar". No se almacenan en base de datos.
+
+## App de Android (Google Play)
+
+El simulador también se publica como app de Android mediante una **Trusted Web Activity**: la app abre el sitio a pantalla completa, sin barra de direcciones, y cada cambio publicado en el sitio llega a la app sin pasar otra vez por Google Play.
+
+- Código de la app: carpeta `android/` (paquete `com.marvinhs.simuladorvisa`).
+- Vinculación app ↔ sitio: `/.well-known/assetlinks.json`.
+- PWA: `manifest.webmanifest`, `sw.js`, `offline.html`, íconos en `assets/icons/`.
+- Política de privacidad: `/privacidad.html`.
+
+### Compilación automática
+
+El flujo `.github/workflows/android.yml` compila la app en GitHub Actions cada vez que cambia la carpeta `android/` (o manualmente desde la pestaña **Actions → App Android → Run workflow**). Los archivos aparecen en **Releases**:
+
+| Archivo | Para qué |
+|---|---|
+| `SimuladorVisa-N-play.aab` | Subir a Google Play Console |
+| `SimuladorVisa-N.apk` | Instalar directamente en un teléfono |
+| `SimuladorVisa-N-prueba.apk` | Prueba rápida (abre con barra de direcciones) |
+
+Para firmar, el repositorio necesita dos secretos en **Settings → Secrets and variables → Actions**:
+
+- `KEYSTORE_BASE64`: el archivo de la llave de firma codificado en base64.
+- `KEYSTORE_PASSWORD`: su contraseña.
+
+⚠️ La llave de firma **nunca** se sube al repositorio. Guárdala en un lugar seguro: sin ella no podrás publicar actualizaciones con la misma llave.
+
+### Después de subir la app a Google Play
+
+Google Play vuelve a firmar la app con su propia llave (*Play App Signing*). Copia la huella **SHA-256** que aparece en Play Console → *Integridad de la app* → *Firma de apps* y agrégala a `sha256_cert_fingerprints` en `/.well-known/assetlinks.json`. Sin ese paso, la app instalada desde Play se abrirá con barra de direcciones.

@@ -14,6 +14,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Practica tu entrevista de visa B1/B2 con un cónsul simulado por IA, basado en tu perfil DS-160.">
     <meta name="theme-color" content="#1e3a8a">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="icon" href="/assets/icons/favicon-32.png" sizes="32x32">
+    <link rel="icon" href="/assets/icons/icon-192.png" sizes="192x192">
+    <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Simulador Visa">
     <title>Simulador Consular DS-160 | Perfil Personalizado</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/style.css?v=5">
@@ -568,7 +574,17 @@
 
 <footer class="text-center text-muted small pb-4 no-print">
     Herramienta de práctica independiente. No está afiliada al Gobierno de los EE. UU.
+    · <a href="/privacidad.html">Política de privacidad</a>
 </footer>
+
+<script>
+    // PWA: necesario para instalar la app y para la versión de Google Play
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js').catch((err) => console.warn('Service worker no registrado:', err));
+        });
+    }
+</script>
 
 <script src="assets/js/voice_engine.js?v=5"></script>
 </body>

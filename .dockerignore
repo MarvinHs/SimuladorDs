@@ -7,3 +7,5 @@ docker-compose.yml
 .dockerignore
 README.md
 uploads/
+android/
+.github/
