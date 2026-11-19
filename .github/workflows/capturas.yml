@@ -1,0 +1,46 @@
+name: Capturas para Google Play
+
+# Toma capturas del sitio publicado en tamaño teléfono (1080x1920)
+# y las deja en Releases. Se ejecuta al cambiar el script o manualmente.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/capturas-play.mjs'
+      - '.github/workflows/capturas.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  capturas:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Instalar Playwright
+        run: |
+          npm init -y >/dev/null
+          npm install playwright@1
+          npx playwright install --with-deps chromium
+
+      - name: Tomar capturas
+        env:
+          SITE_URL: https://simuladords.onrender.com/
+          OUT_DIR: capturas
+        run: node scripts/capturas-play.mjs
+
+      - name: Publicar en Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: capturas-${{ github.run_number }}
+          name: Capturas para Google Play ${{ github.run_number }}
+          body: Capturas de teléfono (1080x1920, 9:16) listas para la ficha de Google Play.
+          files: capturas/*.png
+          prerelease: true
