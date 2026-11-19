@@ -27,7 +27,7 @@
 <body>
 <div class="container py-5 app-container">
     <header class="hero text-center mb-4">
-        <span class="hero-badge">Visa B1/B2 · Práctica con IA</span>
+        <span class="hero-badge">Visa B1/B2 · Práctica con IA. Creada Por SoportesRd</span>
         <h1 class="hero-title">🏛️ Simulador de Entrevista Consular</h1>
         <p class="hero-subtitle">Completa tu perfil DS-160, practica la entrevista por texto o por voz y recibe un informe con tus puntos fuertes, débiles y recomendaciones.</p>
         <ol class="stepper" aria-label="Progreso">
