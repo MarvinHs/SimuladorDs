@@ -266,3 +266,17 @@ body {
 /* ===== Modo presión ===== */
 .countdown-urgent { animation: countdown-pulse .8s infinite; }
 @keyframes countdown-pulse { 50% { transform: scale(1.08); } }
+
+/* ===== Aviso de app independiente (política de Google Play) ===== */
+.disclaimer-oficial {
+    background: #fffbeb;
+    border: 1px solid #fcd34d;
+    border-left: 5px solid #f59e0b;
+    color: #78350f;
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-bottom: 1.5rem;
+    font-size: .92rem;
+    line-height: 1.5;
+}
+.disclaimer-oficial a { color: #92400e; }

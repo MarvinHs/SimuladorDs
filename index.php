@@ -22,13 +22,13 @@
     <meta name="apple-mobile-web-app-title" content="Simulador Visa">
     <title>Simulador Consular DS-160 | Perfil Personalizado</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/style.css?v=5">
+    <link rel="stylesheet" href="assets/css/style.css?v=6">
 </head>
 <body>
 <div class="container py-5 app-container">
     <header class="hero text-center mb-4">
         <span class="hero-badge">Visa B1/B2 · Práctica con IA. Creada Por SoportesRd</span>
-        <h1 class="hero-title">🏛️ Simulador de Entrevista Consular</h1>
+        <h1 class="hero-title">🎯 Simulador de Entrevista Consular</h1>
         <p class="hero-subtitle">Completa tu perfil DS-160, practica la entrevista por texto o por voz y recibe un informe con tus puntos fuertes, débiles y recomendaciones.</p>
         <ol class="stepper" aria-label="Progreso">
             <li id="stepper-1" class="active"><span>1</span> Perfil</li>
@@ -36,6 +36,15 @@
             <li id="stepper-3"><span>3</span> Resultado</li>
         </ol>
     </header>
+
+    <aside class="disclaimer-oficial" role="note" aria-label="Aviso importante">
+        <strong>⚠️ App independiente de práctica.</strong>
+        No representa ni está afiliada al Gobierno de los EE. UU., al Departamento de Estado ni a ninguna embajada o consulado, y no tramita visas.
+        La información oficial está en
+        <a href="https://travel.state.gov/content/travel/en/us-visas/tourism-visit/visitor.html" target="_blank" rel="noopener">travel.state.gov</a>
+        y en la <a href="https://do.usembassy.gov/visas/" target="_blank" rel="noopener">Embajada de EE. UU. en República Dominicana</a>.
+        <a href="/fuentes.html" class="fw-semibold">Ver todas las fuentes oficiales →</a>
+    </aside>
 
     <div id="config-warning" class="alert alert-warning d-none" role="alert">
         <strong>⚠️ Falta configurar la IA.</strong> El servidor no tiene ninguna API key. Crea el archivo <code>.env</code> a partir de <code>.env.example</code> y coloca al menos <code>GEMINI_API_KEY</code> o <code>GROQ_API_KEY</code>.
@@ -524,7 +533,7 @@
                 </div>
 
                 <div class="alert alert-info mt-4" role="note">
-                    <strong>Importante:</strong> utiliza información veraz y coherente con tu solicitud. Este simulador es una herramienta de práctica: no está afiliado al Departamento de Estado ni garantiza la aprobación de una visa. Tus respuestas se envían a un servicio de IA solo para generar la entrevista y no se guardan en este servidor.
+                    <strong>Importante:</strong> utiliza información veraz y coherente con tu solicitud. Este simulador es una herramienta de práctica: no está afiliado al Departamento de Estado ni garantiza la aprobación de una visa. Consulta los requisitos reales en las <a href="/fuentes.html">fuentes oficiales</a>. Tus respuestas se envían a un servicio de IA solo para generar la entrevista y no se guardan en este servidor.
                 </div>
                 <div class="d-grid mt-4">
                     <button type="submit" id="btn-start" class="btn btn-primary btn-lg py-3">🚀 Generar cónsul y empezar entrevista</button>
@@ -573,7 +582,8 @@
 </div>
 
 <footer class="text-center text-muted small pb-4 no-print">
-    Herramienta de práctica independiente. No está afiliada al Gobierno de los EE. UU.
+    Herramienta de práctica independiente. No representa ni está afiliada al Gobierno de los EE. UU.
+    · <a href="/fuentes.html">Fuentes oficiales</a>
     · <a href="/privacidad.html">Política de privacidad</a>
 </footer>
 
@@ -586,6 +596,6 @@
     }
 </script>
 
-<script src="assets/js/voice_engine.js?v=5"></script>
+<script src="assets/js/voice_engine.js?v=6"></script>
 </body>
 </html>

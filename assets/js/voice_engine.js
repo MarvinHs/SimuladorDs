@@ -582,7 +582,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ${score ? `<span class="decision-score">${escapeHtml(score[1])}/10</span>` : ''}
             </div>
             <div class="decision-body">${renderMarkdown(body.replace(/^.*?(APROBADA|RECHAZADA)\s*/i, ''))}</div>
-            <div class="decision-footer">Resultado simulado con fines de práctica. No predice la decisión real del consulado.</div>`;
+            <div class="decision-footer">Resultado simulado con fines de práctica. No predice la decisión real del consulado. Requisitos oficiales: <a href="/fuentes.html">fuentes oficiales</a>.</div>`;
         chatContainer.appendChild(card);
         scrollChat();
     }
