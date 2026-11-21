@@ -1,10 +1,12 @@
-// scripts/capturas-play.mjs
+// scripts/capturas-play.mjs (v2: incluye el aviso de app independiente)
 // Genera capturas de pantalla del sitio real en tamaño de teléfono
 // (1080x1920, proporción 9:16 que exige Google Play).
 // Uso: SITE_URL=https://... node scripts/capturas-play.mjs
 import { chromium } from 'playwright';
 import { mkdir } from 'node:fs/promises';
 
+// Espera a que Render publique la versión nueva antes de capturar
+await new Promise((r) => setTimeout(r, Number(process.env.WAIT_MS || 0)));
 const SITE = process.env.SITE_URL || 'https://simuladords.onrender.com/';
 const OUT = process.env.OUT_DIR || 'capturas';
 await mkdir(OUT, { recursive: true });

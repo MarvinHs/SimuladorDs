@@ -34,6 +34,7 @@ jobs:
         env:
           SITE_URL: https://simuladords.onrender.com/
           OUT_DIR: capturas
+          WAIT_MS: "180000"
         run: node scripts/capturas-play.mjs
 
       - name: Publicar en Releases
